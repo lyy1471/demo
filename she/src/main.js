@@ -1,4 +1,5 @@
 import './style.css'
+import { soundManager } from './sounds.js'
 
 // 游戏配置
 const GAME_CONFIG = {
@@ -6,8 +7,20 @@ const GAME_CONFIG = {
   canvasHeight: 400,
   gridSize: 20,
   initialSnakeLength: 3,
-  gameSpeed: 150,
-  snakeColors: ['#4CAF50', '#8BC34A', '#CDDC39'] // 蛇身渐变色
+  initialGameSpeed: 200,  // 初始游戏速度(毫秒)，数值越小移动越快
+  speedIncreaseInterval: 100, // 每得多少分增加一次速度
+  speedIncreaseAmount: 5,     // 每次提速减少的毫秒数
+  minGameSpeed: 80,          // 最快速度限制
+  snakeColors: [
+    { color: '#4CAF50', glow: '#69F0AE' },
+    { color: '#8BC34A', glow: '#B2FF59' },
+    { color: '#CDDC39', glow: '#EEFF41' }
+  ],
+  foodTypes: [
+    { type: 'normal', color: '#FF5252', glow: '#FF867F', points: 10, probability: 0.7 },
+    { type: 'speed', color: '#2196F3', glow: '#64B5F6', points: 20, probability: 0.15 },
+    { type: 'bonus', color: '#FFC107', glow: '#FFD54F', points: 30, probability: 0.15 }
+  ]
 }
 
 // 游戏状态
@@ -17,6 +30,7 @@ let direction = 'right'
 let gameLoop = null
 let score = 0
 let highScore = localStorage.getItem('highScore') || 0
+let currentGameSpeed = GAME_CONFIG.initialGameSpeed
 
 // 初始化游戏
 function initGame() {
@@ -42,10 +56,14 @@ function initGame() {
 
   // 初始化蛇
   snake = []
+  // 计算蛇的初始位置，将蛇头放在画布中央
+  const startX = Math.floor(GAME_CONFIG.canvasWidth / (2 * GAME_CONFIG.gridSize)) * GAME_CONFIG.gridSize
+  const startY = Math.floor(GAME_CONFIG.canvasHeight / (2 * GAME_CONFIG.gridSize)) * GAME_CONFIG.gridSize
+  // 初始化蛇身，从右向左生成指定长度的蛇身
   for (let i = 0; i < GAME_CONFIG.initialSnakeLength; i++) {
-    snake.unshift({
-      x: Math.floor(GAME_CONFIG.canvasWidth / (2 * GAME_CONFIG.gridSize)) * GAME_CONFIG.gridSize,
-      y: Math.floor(GAME_CONFIG.canvasHeight / (2 * GAME_CONFIG.gridSize)) * GAME_CONFIG.gridSize
+    snake.push({
+      x: startX - (i * GAME_CONFIG.gridSize),
+      y: startY
     })
   }
 
@@ -53,12 +71,18 @@ function initGame() {
   score = 0
   updateScore()
 
+  // 重置游戏速度
+  currentGameSpeed = GAME_CONFIG.initialGameSpeed
+
   // 生成第一个食物
   generateFood()
 
+  // 重置方向
+  direction = 'right'
+
   // 开始游戏循环
   if (gameLoop) clearInterval(gameLoop)
-  gameLoop = setInterval(gameStep, GAME_CONFIG.gameSpeed)
+  gameLoop = setInterval(gameStep, currentGameSpeed)
 
   // 添加键盘控制
   document.addEventListener('keydown', handleKeyPress)
@@ -78,9 +102,27 @@ function generateFood() {
   const canvas = document.querySelector('canvas')
   const ctx = canvas.getContext('2d')
   
+  // 随机选择食物类型
+  const random = Math.random()
+  let selectedType = GAME_CONFIG.foodTypes[0] // 默认普通食物
+  let probability = 0
+  
+  for (const foodType of GAME_CONFIG.foodTypes) {
+    probability += foodType.probability
+    if (random <= probability) {
+      selectedType = foodType
+      break
+    }
+  }
+  
+  // 随机生成食物位置，确保在画布范围内
   food = {
     x: Math.floor(Math.random() * (GAME_CONFIG.canvasWidth / GAME_CONFIG.gridSize)) * GAME_CONFIG.gridSize,
-    y: Math.floor(Math.random() * (GAME_CONFIG.canvasHeight / GAME_CONFIG.gridSize)) * GAME_CONFIG.gridSize
+    y: Math.floor(Math.random() * (GAME_CONFIG.canvasHeight / GAME_CONFIG.gridSize)) * GAME_CONFIG.gridSize,
+    type: selectedType.type,
+    color: selectedType.color,
+    glow: selectedType.glow,
+    points: selectedType.points
   }
 
   // 确保食物不会生成在蛇身上
@@ -142,31 +184,54 @@ function gameStep() {
 
   // 检查是否吃到食物
   if (head.x === food.x && head.y === food.y) {
-    score += 10
+    // 播放吃食物音效
+    soundManager.playSound(food.type === 'bonus' ? 'bonus' : 'eat')
+    
+    // 根据食物类型增加分数
+    score += food.points
+    
+    // 更新最高分
     if (score > highScore) {
       highScore = score
       localStorage.setItem('highScore', highScore)
     }
+    
+    // 根据分数调整游戏速度，每到达特定分数时提升速度
+    if (score % GAME_CONFIG.speedIncreaseInterval === 0 && currentGameSpeed > GAME_CONFIG.minGameSpeed) {
+      currentGameSpeed = Math.max(GAME_CONFIG.minGameSpeed, 
+        currentGameSpeed - GAME_CONFIG.speedIncreaseAmount)
+      clearInterval(gameLoop)
+      gameLoop = setInterval(gameStep, currentGameSpeed)
+    }
+    
     updateScore()
     generateFood()
   } else {
-    snake.pop()
+    snake.pop() // 如果没有吃到食物，移除蛇尾
   }
 
   // 清空画布
   ctx.clearRect(0, 0, canvas.width, canvas.height)
 
   // 绘制食物
-  ctx.fillStyle = '#FF5252'
+  ctx.shadowColor = food.glow
+  ctx.shadowBlur = 15
+  ctx.fillStyle = food.color
   ctx.beginPath()
   ctx.arc(food.x + GAME_CONFIG.gridSize/2, food.y + GAME_CONFIG.gridSize/2, 
          GAME_CONFIG.gridSize/2 - 2, 0, Math.PI * 2)
   ctx.fill()
+  ctx.shadowBlur = 0
 
   // 绘制蛇
   snake.forEach((segment, index) => {
     const colorIndex = index % GAME_CONFIG.snakeColors.length
-    ctx.fillStyle = GAME_CONFIG.snakeColors[colorIndex]
+    const { color, glow } = GAME_CONFIG.snakeColors[colorIndex]
+    
+    // 添加发光效果
+    ctx.shadowColor = glow
+    ctx.shadowBlur = 10
+    ctx.fillStyle = color
     
     // 绘制圆角矩形作为蛇身
     const radius = GAME_CONFIG.gridSize / 4
@@ -175,12 +240,16 @@ function gameStep() {
                  GAME_CONFIG.gridSize - 2, GAME_CONFIG.gridSize - 2, 
                  radius)
     ctx.fill()
+    
+    // 重置阴影效果
+    ctx.shadowBlur = 0
   })
 }
 
 // 游戏结束
 function gameOver() {
   clearInterval(gameLoop)
+  soundManager.playSound('crash')
   
   // 创建游戏结束面板
   const gameOverPanel = document.createElement('div')
