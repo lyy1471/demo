@@ -1,6 +1,7 @@
 import './style.css'
 import { soundManager } from './sounds.js'
 import foodIcons from './foodIcons.js'
+import obstacleIcons from './obstacleIcons.js'
 
 // 游戏配置对象，包含所有游戏相关的参数设置
 const GAME_CONFIG = {
@@ -488,11 +489,11 @@ function gameStep() {
   // 添加新头部
   snake.unshift(head)
 
-  // 检查是否吃到食物，增加一点碰撞检测的容差
-  const collisionTolerance = GAME_CONFIG.gridSize / 2
+  // 检查是否吃到食物，使用更精确的碰撞检测
+  const collisionTolerance = GAME_CONFIG.gridSize / 3
   if (
-    Math.abs(head.x - food.x) < collisionTolerance &&
-    Math.abs(head.y - food.y) < collisionTolerance
+    Math.abs((head.x + GAME_CONFIG.gridSize/2) - (food.x + GAME_CONFIG.gridSize/2)) < collisionTolerance &&
+    Math.abs((head.y + GAME_CONFIG.gridSize/2) - (food.y + GAME_CONFIG.gridSize/2)) < collisionTolerance
   ) {
     // 播放吃食物音效
     soundManager.playSound(food.type === 'bonus' ? 'bonus' : 'eat')
@@ -500,6 +501,16 @@ function gameStep() {
     // 根据食物类型增加分数和特殊效果
     if (food.type === 'double') {
       score += food.points * 2  // 双倍积分
+    } else if (food.type === 'speed') {
+      score += food.points
+      currentGameSpeed = Math.max(GAME_CONFIG.minGameSpeed, currentGameSpeed - GAME_CONFIG.speedIncreaseAmount * 2)
+      clearInterval(gameLoop)
+      gameLoop = setInterval(gameStep, currentGameSpeed)
+    } else if (food.type === 'slow') {
+      score += food.points
+      currentGameSpeed = currentGameSpeed + GAME_CONFIG.speedIncreaseAmount * 2
+      clearInterval(gameLoop)
+      gameLoop = setInterval(gameStep, currentGameSpeed)
     } else {
       score += food.points
     }
@@ -552,13 +563,12 @@ function gameStep() {
   ctx.shadowBlur = 0
 
   // 绘制障碍物
-  ctx.shadowColor = '#FF4444'
-  ctx.shadowBlur = 10
-  ctx.fillStyle = '#D32F2F'
+  ctx.font = `${obstacleIcons.rock.size}px Arial`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
   obstacles.forEach(obstacle => {
-    ctx.fillRect(obstacle.x, obstacle.y, GAME_CONFIG.gridSize - 2, GAME_CONFIG.gridSize - 2)
+    ctx.fillText(obstacleIcons.rock.emoji, obstacle.x + GAME_CONFIG.gridSize/2, obstacle.y + GAME_CONFIG.gridSize/2)
   })
-  ctx.shadowBlur = 0
 
   // 绘制蛇
   snake.forEach((segment, index) => {
