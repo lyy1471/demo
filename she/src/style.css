@@ -55,6 +55,27 @@ canvas {
   border-radius: 15px;
   backdrop-filter: blur(10px);
   animation: fadeIn 0.5s ease-in-out;
+  width: 80%;
+  max-width: 400px;
+}
+
+.game-over button {
+  margin: 10px;
+  padding: 15px 30px;
+  font-size: 1.2em;
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  width: 80%;
+  max-width: 250px;
+}
+
+.game-over button:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
 }
 
 @keyframes fadeIn {
@@ -104,4 +125,42 @@ canvas {
 .mode-btn:active {
   transform: translateY(0);
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.virtual-controls {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  z-index: 1000;
+}
+
+.horizontal-controls {
+  display: flex;
+  gap: 20px;
+}
+
+.control-btn {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 24px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  backdrop-filter: blur(5px);
+  transition: all 0.2s ease;
+}
+
+.control-btn:active {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(0.95);
 }
