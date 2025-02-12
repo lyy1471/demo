@@ -8,6 +8,10 @@ class Game {
         this.floorElement = document.getElementById('floor');
         this.floor = 0;  // 当前层数
         this.gameStartTime = Date.now();  // 记录游戏开始时间
+        this.jumpSound = new Audio();  // 跳跃音效
+        this.gameOverSound = new Audio();  // 游戏结束音效
+        this.platformLandSound = new Audio();  // 落地音效
+        this.gameStartSound = new Audio();  // 游戏开始音效
         
         // 初始化玩家属性
         this.player = {
@@ -21,19 +25,20 @@ class Game {
             isMovingRight: false,      // 是否向右移动
             isJumping: false,          // 是否在跳跃
             jumpStartTime: 0,          // 开始跳跃的时间
-            emoji: '🏃'                // 玩家显示图标
+            emoji: '🏃‍♂️',               // 玩家显示图标
+            direction: 1                // 朝向：1表示向右，-1表示向左
         };
 
         // 初始化游戏参数
         this.platforms = [];          // 平台数组
-        this.gravity = 0.5;          // 重力加速度
-        this.jumpForce = -12;        // 跳跃力度
-        this.maxJumpForce = -16;     // 最大跳跃力度
-        this.minJumpForce = -8;      // 最小跳跃力度
-        this.maxJumpTime = 500;      // 最长跳跃按键时间（毫秒）
-        this.baseSpeed = 5;          // 基础移动速度
+        this.gravity = 0.6;          // 增加重力加速度，让下落更快
+        this.jumpForce = -13;        // 调整基础跳跃力度
+        this.maxJumpForce = -17;     // 调整最大跳跃力度
+        this.minJumpForce = -9;      // 调整最小跳跃力度
+        this.maxJumpTime = 300;      // 减少最长跳跃按键时间，让控制更精确
+        this.baseSpeed = 6;          // 增加基础移动速度
         this.moveSpeed = this.baseSpeed;  // 当前移动速度
-        this.scrollSpeed = 2;        // 画面滚动速度
+        this.scrollSpeed = 2.5;      // 增加初始画面滚动速度
         this.gameOver = false;       // 游戏结束标志
         this.sawTeeth = [];         // 顶部锯齿数组
         this.lastPlatform = null;    // 记录最后生成的平台
@@ -53,6 +58,8 @@ class Game {
         // 初始化游戏
         this.init();
         this.setupEventListeners();
+        // 自动设置焦点到canvas元素
+        this.canvas.focus();
         this.gameLoop();
     }
 
@@ -83,10 +90,12 @@ class Game {
             if (e.code === 'ArrowLeft') {
                 this.player.isMovingLeft = true;
                 this.player.isMovingRight = false;
+                this.player.direction = -1;
             }
             if (e.code === 'ArrowRight') {
                 this.player.isMovingRight = true;
                 this.player.isMovingLeft = false;
+                this.player.direction = 1;
             }
         });
 
@@ -94,7 +103,8 @@ class Game {
         document.addEventListener('keyup', (e) => {
             if (e.code === 'Space' && this.player.isJumping) {
                 const jumpTime = Math.min(Date.now() - this.player.jumpStartTime, this.maxJumpTime);
-                const jumpForce = this.minJumpForce + (jumpTime / this.maxJumpTime) * (this.maxJumpForce - this.minJumpForce);
+                // 无论按多久，跳跃力度都不会超过maxJumpForce
+                const jumpForce = Math.max(this.maxJumpForce, this.minJumpForce + (jumpTime / this.maxJumpTime) * (this.maxJumpForce - this.minJumpForce));
                 this.player.speedY = jumpForce;
             }
             if (e.code === 'ArrowLeft') {
@@ -105,15 +115,7 @@ class Game {
             }
         });
 
-        // 画布点击事件（触发跳跃）
-        this.canvas.addEventListener('click', () => {
-            if (!this.player.isJumping) {
-                this.player.jumpStartTime = Date.now();
-                this.player.isJumping = true;
-                // 点击时默认使用最小跳跃力度
-                this.player.speedY = this.minJumpForce;
-            }
-        });
+
     }
 
     // 生成新的平台
@@ -143,8 +145,8 @@ class Game {
         let y;
         if (this.lastPlatform) {
             // 根据上一个平台的位置，确定新平台的垂直位置
-            const minVerticalDistance = 80;  // 最小垂直距离
-            const maxVerticalDistance = 120; // 最大垂直距离
+            const minVerticalDistance = 60;  // 减少最小垂直距离
+            const maxVerticalDistance = 100; // 减少最大垂直距离
             const verticalDistance = Math.floor(Math.random() * (maxVerticalDistance - minVerticalDistance + 1)) + minVerticalDistance;
             y = this.lastPlatform.y + verticalDistance;
         } else {
@@ -169,8 +171,8 @@ class Game {
 
         // 根据游戏时间动态调整难度
         const gameTime = (Date.now() - this.gameStartTime) / 1000; // 游戏时间（秒）
-        this.moveSpeed = this.baseSpeed + (gameTime / 30); // 每30秒增加1点速度
-        this.scrollSpeed = 2 + (gameTime / 60); // 每60秒增加1点滚动速度
+        this.moveSpeed = this.baseSpeed + (gameTime / 20); // 加快速度增长
+        this.scrollSpeed = 2.5 + (gameTime / 40); // 加快滚动速度增长
 
         // 更新玩家垂直位置（应用重力）
         this.player.speedY += this.gravity;
@@ -215,6 +217,7 @@ class Game {
                 this.player.speedY = 0;
                 this.player.isJumping = false;
                 onPlatform = true;
+                this.platformLandSound.play().catch(e => {}); // 添加落地音效
                 break;
             }
         }
@@ -236,6 +239,7 @@ class Game {
         // 检查游戏结束条件（玩家触顶或掉出屏幕）
         if (this.player.y < 0 || this.player.y > this.canvas.height) {
             this.gameOver = true;
+            this.gameOverSound.play().catch(e => {}); // 添加游戏结束音效
         }
     }
 
@@ -258,7 +262,14 @@ class Game {
         // 绘制玩家
         this.ctx.font = '30px Arial';
         this.ctx.textBaseline = 'top';
-        this.ctx.fillText(this.player.emoji, this.player.x, this.player.y);
+        this.ctx.save();
+        if (this.player.direction === -1) {
+            this.ctx.scale(-1, 1);
+            this.ctx.fillText(this.player.emoji, -this.player.x - this.player.width, this.player.y);
+        } else {
+            this.ctx.fillText(this.player.emoji, this.player.x, this.player.y);
+        }
+        this.ctx.restore();
 
         // 绘制平台
         this.ctx.fillStyle = '#333';
@@ -285,6 +296,10 @@ class Game {
 
     // 游戏主循环
     gameLoop() {
+        if (!this.gameStarted) {
+            this.gameStarted = true;
+            this.gameStartSound.play().catch(e => {}); // 添加游戏开始音效
+        }
         this.update();  // 更新游戏状态
         this.draw();    // 绘制画面
         requestAnimationFrame(() => this.gameLoop());  // 请求下一帧动画
