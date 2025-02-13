@@ -7,17 +7,31 @@ class SoundManager {
 
   // 加载音效
   loadSound(name, url) {
-    this.sounds[name] = new Audio(url)
+    if (!name || !url) {
+      console.warn('加载音效失败：无效的音效名称或URL')
+      return
+    }
+    try {
+      this.sounds[name] = new Audio(url)
+    } catch (error) {
+      console.warn(`加载音效 ${name} 失败：`, error.message)
+    }
   }
 
   // 播放音效
   playSound(name) {
-    // 暂时不播放音效，等待后续添加实际的音频文件
-    if (this.sounds[name]) {
+    if (!this.sounds[name]) {
+      return
+    }
+    
+    try {
       this.sounds[name].currentTime = 0
-      this.sounds[name].play().catch(error => {
-        console.log(`播放音效 ${name} 失败:`, error)
-      })
+      this.sounds[name].play()
+    } catch (error) {
+      // 只在开发环境下输出详细错误信息
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`播放音效 ${name} 失败：`, error.message)
+      }
     }
   }
 }

@@ -41,6 +41,35 @@ canvas {
   backdrop-filter: blur(5px);
   color: #fff;
   font-size: 1.2em;
+
+  
+  .level-transition {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #fff;
+    font-size: 36px;
+    font-weight: bold;
+    text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+    animation: levelFadeIn 1.5s ease-out;
+    z-index: 1000;
+  }
+  
+  @keyframes levelFadeIn {
+    0% {
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.8);
+    }
+    50% {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1.2);
+    }
+    100% {
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(1);
+    }
+  }
 }
 
 .game-over {

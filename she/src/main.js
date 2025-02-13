@@ -2,6 +2,7 @@ import './style.css'
 import { soundManager } from './sounds.js'
 import foodIcons from './foodIcons.js'
 import obstacleIcons from './obstacleIcons.js'
+import { render } from './renderer.js'
 
 // 游戏配置对象，包含所有游戏相关的参数设置
 const GAME_CONFIG = {
@@ -15,7 +16,7 @@ const GAME_CONFIG = {
   // 游戏网格大小，决定蛇身、食物和障碍物的大小
   gridSize: 20,
   
-  // 蛇的初始长度
+  // 蛇的初始长度 
   initialSnakeLength: 3,
   
   // 游戏速度相关设置
@@ -47,11 +48,11 @@ const GAME_CONFIG = {
     scoreIncrease: 50       // 每关增加的目标分数
   },
   
-  // 蛇身颜色配置，包含颜色和发光效果
+  // 蛇身颜色配置，包含颜色和发光效果 - 卡通可爱风格
   snakeColors: [
-    { color: '#4CAF50', glow: '#69F0AE' },  // 绿色主体
-    { color: '#8BC34A', glow: '#B2FF59' },  // 浅绿过渡
-    { color: '#CDDC39', glow: '#EEFF41' }   // 黄绿尾部
+    { color: '#FF69B4', glow: '#FFB6C1' },  // 粉色主体
+    { color: '#FF1493', glow: '#FF69B4' },  // 深粉过渡
+    { color: '#FFB6C1', glow: '#FFC0CB' }   // 浅粉尾部
   ],
   
   // 食物类型配置
@@ -167,6 +168,11 @@ function initGame() {
   canvas.width = GAME_CONFIG.canvasWidth
   canvas.height = GAME_CONFIG.canvasHeight
   
+  // 获取2D上下文并设置基本属性
+  const ctx = canvas.getContext('2d')
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
+  
   // 创建计分板
   const scoreBoard = document.createElement('div')
   scoreBoard.className = 'score-board'
@@ -204,9 +210,9 @@ function initGame() {
 
   // 根据设备类型添加控制
   if (GAME_CONFIG.isMobile) {
-    initTouchControls()
+    initTouchControls(gameLoop, currentGameSpeed, GAME_CONFIG, gameStep)
   } else {
-    document.addEventListener('keydown', handleKeyPress)
+    document.addEventListener('keydown', (event) => handleKeyPress(event, direction))
   }
 }
 
@@ -314,20 +320,22 @@ function initTouchControls() {
   let touchStartY = 0
   let touchStartTime = 0
   let isLongPress = false
-  const minSwipeDistance = 30 // 最小滑动距离，用于判断滑动方向
+  let longPressTimer = null
+  const minSwipeDistance = 30
 
-  // 触摸开始事件处理
   document.addEventListener('touchstart', (e) => {
     touchStartX = e.touches[0].clientX
     touchStartY = e.touches[0].clientY
     touchStartTime = Date.now()
     isLongPress = false
 
-    // 启动长按检测，用于实现加速功能
-    setTimeout(() => {
+    // 清除之前的长按计时器
+    if (longPressTimer) clearTimeout(longPressTimer)
+
+    // 设置新的长按计时器
+    longPressTimer = setTimeout(() => {
       if (touchStartTime) {
         isLongPress = true
-        // 启用长按加速功能
         if (GAME_CONFIG.touchSpeedBoost.enabled) {
           GAME_CONFIG.normalSpeed = currentGameSpeed
           currentGameSpeed = GAME_CONFIG.touchSpeedBoost.boostSpeed
@@ -338,21 +346,27 @@ function initTouchControls() {
     }, GAME_CONFIG.touchSpeedBoost.minTouchDuration)
   })
 
-  // 防止页面滚动
   document.addEventListener('touchmove', (e) => {
     e.preventDefault()
+    // 如果是长按状态，取消滑动方向改变
+    if (isLongPress) return
   }, { passive: false })
 
-  // 触摸结束事件处理
   document.addEventListener('touchend', (e) => {
+    // 清除长按计时器
+    if (longPressTimer) {
+      clearTimeout(longPressTimer)
+      longPressTimer = null
+    }
+
     const touchEndX = e.changedTouches[0].clientX
     const touchEndY = e.changedTouches[0].clientY
     const deltaX = touchEndX - touchStartX
     const deltaY = touchEndY - touchStartY
     const touchDuration = Date.now() - touchStartTime
 
-    // 恢复正常速度（如果处于加速状态）
-    if (isLongPress && GAME_CONFIG.touchSpeedBoost.enabled && GAME_CONFIG.normalSpeed) {
+    // 恢复正常速度
+    if (GAME_CONFIG.touchSpeedBoost.enabled && GAME_CONFIG.normalSpeed) {
       currentGameSpeed = GAME_CONFIG.normalSpeed
       GAME_CONFIG.normalSpeed = null
       clearInterval(gameLoop)
@@ -362,8 +376,8 @@ function initTouchControls() {
     touchStartTime = 0
     isLongPress = false
 
-    // 根据滑动距离和方向改变蛇的移动方向
-    if (Math.abs(deltaX) > minSwipeDistance || Math.abs(deltaY) > minSwipeDistance) {
+    // 只在非长按状态下处理滑动
+    if (!isLongPress && (Math.abs(deltaX) > minSwipeDistance || Math.abs(deltaY) > minSwipeDistance)) {
       if (Math.abs(deltaX) > Math.abs(deltaY)) {
         changeDirection(deltaX > 0 ? 'right' : 'left')
       } else {
@@ -491,10 +505,16 @@ function gameStep() {
 
   // 检查是否吃到食物，使用更精确的碰撞检测
   const collisionTolerance = GAME_CONFIG.gridSize / 3
+
+
+
+  // 在gameStep函数中，吃到食物时添加得分动画
   if (
     Math.abs((head.x + GAME_CONFIG.gridSize/2) - (food.x + GAME_CONFIG.gridSize/2)) < collisionTolerance &&
     Math.abs((head.y + GAME_CONFIG.gridSize/2) - (food.y + GAME_CONFIG.gridSize/2)) < collisionTolerance
   ) {
+
+
     // 播放吃食物音效
     soundManager.playSound(food.type === 'bonus' ? 'bonus' : 'eat')
     
@@ -503,14 +523,24 @@ function gameStep() {
       score += food.points * 2  // 双倍积分
     } else if (food.type === 'speed') {
       score += food.points
-      currentGameSpeed = Math.max(GAME_CONFIG.minGameSpeed, currentGameSpeed - GAME_CONFIG.speedIncreaseAmount * 2)
-      clearInterval(gameLoop)
-      gameLoop = setInterval(gameStep, currentGameSpeed)
+      // 使用平滑的速度增长算法
+      const speedIncrease = Math.floor(score / GAME_CONFIG.speedIncreaseInterval) * GAME_CONFIG.speedIncreaseAmount
+      const newSpeed = Math.max(GAME_CONFIG.minGameSpeed, GAME_CONFIG.initialGameSpeed - speedIncrease)
+      if (newSpeed !== currentGameSpeed) {
+        currentGameSpeed = newSpeed
+        clearInterval(gameLoop)
+        gameLoop = setInterval(gameStep, currentGameSpeed)
+      }
     } else if (food.type === 'slow') {
       score += food.points
-      currentGameSpeed = currentGameSpeed + GAME_CONFIG.speedIncreaseAmount * 2
-      clearInterval(gameLoop)
-      gameLoop = setInterval(gameStep, currentGameSpeed)
+      // 限制减速效果，确保游戏节奏不会过慢
+      const maxSlowSpeed = GAME_CONFIG.initialGameSpeed * 1.2
+      const newSpeed = Math.min(maxSlowSpeed, currentGameSpeed + GAME_CONFIG.speedIncreaseAmount)
+      if (newSpeed !== currentGameSpeed) {
+        currentGameSpeed = newSpeed
+        clearInterval(gameLoop)
+        gameLoop = setInterval(gameStep, currentGameSpeed)
+      }
     } else {
       score += food.points
     }
@@ -549,48 +579,12 @@ function gameStep() {
   // 更新分数显示
   updateScore()
 
-  // 清空画布
-  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  // 确保画布上下文状态正确
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
 
-  // 绘制食物
-  const foodIcon = foodIcons[food.type]
-  ctx.shadowColor = food.glow
-  ctx.shadowBlur = 15
-  ctx.font = `${foodIcon.size}px Arial`
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillText(foodIcon.emoji, food.x + GAME_CONFIG.gridSize/2, food.y + GAME_CONFIG.gridSize/2)
-  ctx.shadowBlur = 0
-
-  // 绘制障碍物
-  ctx.font = `${obstacleIcons.rock.size}px Arial`
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  obstacles.forEach(obstacle => {
-    ctx.fillText(obstacleIcons.rock.emoji, obstacle.x + GAME_CONFIG.gridSize/2, obstacle.y + GAME_CONFIG.gridSize/2)
-  })
-
-  // 绘制蛇
-  snake.forEach((segment, index) => {
-    const colorIndex = index % GAME_CONFIG.snakeColors.length
-    const { color, glow } = GAME_CONFIG.snakeColors[colorIndex]
-    
-    // 添加发光效果
-    ctx.shadowColor = glow
-    ctx.shadowBlur = 10
-    ctx.fillStyle = color
-    
-    // 绘制圆角矩形作为蛇身
-    const radius = GAME_CONFIG.gridSize / 4
-    ctx.beginPath()
-    ctx.roundRect(segment.x, segment.y, 
-                   GAME_CONFIG.gridSize - 2, GAME_CONFIG.gridSize - 2, 
-                   radius)
-    ctx.fill()
-    
-    // 重置阴影效果
-    ctx.shadowBlur = 0
-  })
+  // 使用渲染器模块进行渲染
+  render(ctx, snake, food, obstacles, GAME_CONFIG, foodIcons, obstacleIcons)
 }
 
 // 游戏结束
