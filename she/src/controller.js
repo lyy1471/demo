@@ -4,7 +4,7 @@
 export function changeDirection(newDirection, currentDirection) {
   // 防止蛇反向移动（例如向右移动时不能直接向左转向）
   const opposites = { up: 'down', down: 'up', left: 'right', right: 'left' }
-  if (opposites[newDirection] !== currentDirection) {
+  if (newDirection && opposites[newDirection] !== currentDirection) {
     return newDirection
   }
   return currentDirection
@@ -25,10 +25,7 @@ export function handleKeyPress(event, currentDirection) {
   }[event.key]
 
   // 如果是有效的方向键，则改变方向
-  if (newDirection) {
-    return changeDirection(newDirection, currentDirection)
-  }
-  return currentDirection
+  return changeDirection(newDirection, currentDirection)
 }
 
 // 初始化触摸控制
@@ -80,7 +77,6 @@ export function initTouchControls(gameLoop, currentGameSpeed, GAME_CONFIG, gameS
     const touchEndY = e.changedTouches[0].clientY
     const deltaX = touchEndX - touchStartX
     const deltaY = touchEndY - touchStartY
-    const touchDuration = Date.now() - touchStartTime
 
     // 恢复正常速度
     if (GAME_CONFIG.touchSpeedBoost.enabled && GAME_CONFIG.normalSpeed) {
@@ -95,12 +91,15 @@ export function initTouchControls(gameLoop, currentGameSpeed, GAME_CONFIG, gameS
 
     // 只在非长按状态下处理滑动
     if (!isLongPress && (Math.abs(deltaX) > minSwipeDistance || Math.abs(deltaY) > minSwipeDistance)) {
+      let newDirection
       if (Math.abs(deltaX) > Math.abs(deltaY)) {
-        return deltaX > 0 ? 'right' : 'left'
+        newDirection = deltaX > 0 ? 'right' : 'left'
       } else {
-        return deltaY > 0 ? 'down' : 'up'
+        newDirection = deltaY > 0 ? 'down' : 'up'
       }
+      return changeDirection(newDirection, direction)
     }
+    return direction
   })
 }
 
@@ -121,7 +120,8 @@ export function createVirtualControls(onDirectionChange) {
   controls.addEventListener('touchstart', (e) => {
     if (e.target.classList.contains('control-btn')) {
       e.preventDefault()
-      onDirectionChange(e.target.dataset.direction)
+      const newDirection = e.target.dataset.direction
+      onDirectionChange(changeDirection(newDirection, direction))
     }
   })
 

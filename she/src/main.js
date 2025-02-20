@@ -3,6 +3,7 @@ import { soundManager } from './sounds.js'
 import foodIcons from './foodIcons.js'
 import obstacleIcons from './obstacleIcons.js'
 import { render } from './renderer.js'
+import { adjustCanvasSize, createGameLayout, createModeSelection, createContinueGameModal, createGameOverPanel, updateScoreBoard } from './layout.js'
 
 // 游戏配置对象，包含所有游戏相关的参数设置
 const GAME_CONFIG = {
@@ -78,6 +79,8 @@ let food = null
 let obstacles = []
 // 蛇当前的移动方向，可能的值：'up', 'down', 'left', 'right'
 let direction = 'right'
+// 蛇的下一个移动方向，初始值与当前方向相同
+let nextDirection = direction
 // 游戏主循环的计时器 ID，用于控制游戏的暂停和继续
 let gameLoop = null
 // 当前游戏得分
@@ -89,57 +92,60 @@ let currentGameSpeed = GAME_CONFIG.initialGameSpeed
 
 // 显示模式选择界面
 function showModeSelection() {
-  const app = document.querySelector('#app')
-  app.innerHTML = ''
-
-  // 创建游戏标题
-  const title = document.createElement('h1')
-  title.className = 'game-title'
-  title.textContent = '贪吃蛇'
-  app.appendChild(title)
-
-  // 创建模式选择容器
-  const modeContainer = document.createElement('div')
-  modeContainer.className = 'mode-selection'
-  modeContainer.innerHTML = `
-    <button class="mode-btn" data-mode="default">默认模式</button>
-    <button class="mode-btn" data-mode="levels">闯关模式</button>
-  `
-
+  const modeContainer = createModeSelection()
+  
   // 添加模式选择事件监听
   modeContainer.addEventListener('click', (e) => {
     if (e.target.classList.contains('mode-btn')) {
       GAME_CONFIG.gameMode = e.target.dataset.mode
-      GAME_CONFIG.currentLevel = 1
-      // 根据游戏模式设置穿墙功能
-      GAME_CONFIG.wallPassEnabled = e.target.dataset.mode === 'levels'
-      initGame()
+      
+      if (e.target.dataset.mode === 'levels') {
+        // 获取上次保存的关卡进度
+        const savedLevel = parseInt(localStorage.getItem('lastLevel')) || 1
+        
+        // 如果有存档且不是第一关，显示选择弹窗
+        if (savedLevel > 1) {
+          // 创建选择弹窗
+          const modal = createContinueGameModal(savedLevel)
+          
+          // 添加弹窗点击事件
+          modal.addEventListener('click', (event) => {
+            if (event.target.classList.contains('modal-btn')) {
+              if (event.target.dataset.action === 'new') {
+                GAME_CONFIG.currentLevel = 1
+              } else if (event.target.dataset.action === 'continue') {
+                GAME_CONFIG.currentLevel = savedLevel
+              }
+              // 保存当前关卡
+              localStorage.setItem('lastLevel', GAME_CONFIG.currentLevel)
+              // 设置穿墙功能并开始游戏
+              GAME_CONFIG.wallPassEnabled = true
+              modal.remove()
+              initGame()
+            }
+          })
+          
+          document.body.appendChild(modal)
+        } else {
+          // 没有存档或是第一关，直接开始新游戏
+          GAME_CONFIG.currentLevel = 1
+          localStorage.setItem('lastLevel', GAME_CONFIG.currentLevel)
+          GAME_CONFIG.wallPassEnabled = true
+          initGame()
+        }
+      } else {
+        // 默认模式直接开始
+        GAME_CONFIG.currentLevel = 1
+        GAME_CONFIG.wallPassEnabled = false
+        initGame()
+      }
     }
   })
 
   app.appendChild(modeContainer)
 }
 
-// 根据屏幕方向和尺寸调整画布大小
-function adjustCanvasSize() {
-  const screenWidth = window.innerWidth
-  const screenHeight = window.innerHeight
-  const isPortrait = screenHeight > screenWidth
-  const padding = 20
-  
-  if (GAME_CONFIG.isMobile) {
-    // 根据屏幕方向调整画布尺寸
-    if (isPortrait) {
-      GAME_CONFIG.canvasWidth = Math.min(screenWidth - padding * 2, 400)
-      GAME_CONFIG.canvasHeight = Math.min(screenHeight * 0.6, 600)
-    } else {
-      GAME_CONFIG.canvasWidth = Math.min(screenWidth * 0.7, 600)
-      GAME_CONFIG.canvasHeight = Math.min(screenHeight - padding * 2, 400)
-    }
-    // 确保网格大小适配屏幕
-    GAME_CONFIG.gridSize = Math.max(Math.floor(GAME_CONFIG.canvasWidth / 30), 15)
-  }
-}
+
 
 // 监听屏幕旋转事件
 window.addEventListener('resize', () => {
@@ -156,32 +162,10 @@ window.addEventListener('resize', () => {
 // 初始化游戏
 function initGame() {
   // 初始化时调整画布大小
-  adjustCanvasSize()
+  adjustCanvasSize(GAME_CONFIG)
   
-  // 创建游戏标题，根据模式显示不同标题
-  const title = document.createElement('h1')
-  title.className = 'game-title'
-  title.textContent = GAME_CONFIG.gameMode === 'levels' ? `贪吃蛇 - 第${GAME_CONFIG.currentLevel}关` : '贪吃蛇'
-  
-  // 创建游戏画布
-  const canvas = document.createElement('canvas')
-  canvas.width = GAME_CONFIG.canvasWidth
-  canvas.height = GAME_CONFIG.canvasHeight
-  
-  // 获取2D上下文并设置基本属性
-  const ctx = canvas.getContext('2d')
-  ctx.imageSmoothingEnabled = true
-  ctx.imageSmoothingQuality = 'high'
-  
-  // 创建计分板
-  const scoreBoard = document.createElement('div')
-  scoreBoard.className = 'score-board'
-  
-  // 清空并添加游戏元素
-  document.querySelector('#app').innerHTML = ''
-  document.querySelector('#app').appendChild(title)
-  document.querySelector('#app').appendChild(canvas)
-  document.querySelector('#app').appendChild(scoreBoard)
+  // 创建游戏布局
+  const { canvas, ctx } = createGameLayout(GAME_CONFIG)
 
   // 初始化蛇的位置和长度
   snake = []
@@ -203,6 +187,7 @@ function initGame() {
   obstacles = generateObstacles()
   generateFood()
   direction = 'right'
+  nextDirection = 'right'
 
   // 启动游戏循环
   if (gameLoop) clearInterval(gameLoop)
@@ -212,30 +197,29 @@ function initGame() {
   if (GAME_CONFIG.isMobile) {
     initTouchControls(gameLoop, currentGameSpeed, GAME_CONFIG, gameStep)
   } else {
-    document.addEventListener('keydown', (event) => handleKeyPress(event, direction))
+    // 添加按键冷却时间变量
+    let lastKeyPressTime = 0;
+
+    const KEY_COOLDOWN = 50; // 设置50毫秒的按键冷却时间
+
+    document.addEventListener('keydown', (event) => {
+      const currentTime = Date.now();
+      // 检查是否超过冷却时间
+      if (currentTime - lastKeyPressTime < KEY_COOLDOWN) {
+        return;
+      }
+      lastKeyPressTime = currentTime;
+      const newDirection = handleKeyPress(event, direction);
+      if (newDirection) {
+        nextDirection = newDirection;
+      }
+    })
   }
 }
 
 // 更新分数显示
 function updateScore() {
-  const scoreBoard = document.querySelector('.score-board')
-  let content = `
-    分数: ${score}<br>
-    最高分: ${highScore}
-  `
-  
-  if (GAME_CONFIG.gameMode === 'levels') {
-    const targetScore = GAME_CONFIG.levelConfig.targetScore + 
-      (GAME_CONFIG.currentLevel - 1) * GAME_CONFIG.levelConfig.scoreIncrease
-    content = `
-      第${GAME_CONFIG.currentLevel}关<br>
-      分数: ${score}<br>
-      目标: ${targetScore}<br>
-      最高分: ${highScore}
-    `
-  }
-  
-  scoreBoard.innerHTML = content
+  updateScoreBoard(score, highScore, GAME_CONFIG)
 }
 
 // 生成障碍物
@@ -253,20 +237,40 @@ function generateObstacles() {
   );
   const newObstacles = [];
   
+  // 定义蛇头周围的安全区域（以格子为单位）
+  const safeZoneSize = 5; // 增加安全区域大小
+  const snakeHead = snake[0];
+  
   // 循环生成指定数量的障碍物
   for (let i = 0; i < obstacleCount; i++) {
     let obstacle;
+    let attempts = 0;
+    const maxAttempts = 100; // 防止无限循环
+    
     do {
       // 随机生成障碍物位置
       obstacle = {
         x: Math.floor(Math.random() * (GAME_CONFIG.canvasWidth / GAME_CONFIG.gridSize)) * GAME_CONFIG.gridSize,
         y: Math.floor(Math.random() * (GAME_CONFIG.canvasHeight / GAME_CONFIG.gridSize)) * GAME_CONFIG.gridSize
       };
+      
+      attempts++;
+      if (attempts >= maxAttempts) {
+        // 如果尝试次数过多，说明可能没有合适的位置，减少障碍物数量
+        return newObstacles;
+      }
     } while (
       // 确保障碍物不会生成在蛇身上或其他障碍物上
       snake.some(segment => segment.x === obstacle.x && segment.y === obstacle.y) ||
-      newObstacles.some(obs => obs.x === obstacle.x && obs.y === obstacle.y)
+      newObstacles.some(obs => obs.x === obstacle.x && obs.y === obstacle.y) ||
+      // 使用更严格的安全区域判定，确保蛇头周围有足够的活动空间
+      (Math.abs(obstacle.x - snakeHead.x) <= GAME_CONFIG.gridSize * safeZoneSize &&
+       Math.abs(obstacle.y - snakeHead.y) <= GAME_CONFIG.gridSize * safeZoneSize) ||
+      // 额外检查对角线方向的安全距离
+      (Math.sqrt(Math.pow(obstacle.x - snakeHead.x, 2) + Math.pow(obstacle.y - snakeHead.y, 2)) <= 
+       GAME_CONFIG.gridSize * (safeZoneSize - 1))
     );
+    
     newObstacles.push(obstacle);
   }
   return newObstacles;
@@ -378,11 +382,13 @@ function initTouchControls() {
 
     // 只在非长按状态下处理滑动
     if (!isLongPress && (Math.abs(deltaX) > minSwipeDistance || Math.abs(deltaY) > minSwipeDistance)) {
+      let newDirection;
       if (Math.abs(deltaX) > Math.abs(deltaY)) {
-        changeDirection(deltaX > 0 ? 'right' : 'left')
+        newDirection = deltaX > 0 ? 'right' : 'left';
       } else {
-        changeDirection(deltaY > 0 ? 'down' : 'up')
+        newDirection = deltaY > 0 ? 'down' : 'up';
       }
+      nextDirection = changeDirection(newDirection, direction)
     }
   })
 }
@@ -404,49 +410,25 @@ function createVirtualControls() {
   controls.addEventListener('touchstart', (e) => {
     if (e.target.classList.contains('control-btn')) {
       e.preventDefault()
-      changeDirection(e.target.dataset.direction)
+      nextDirection = changeDirection(e.target.dataset.direction, direction)
     }
   })
 
   document.querySelector('#app').appendChild(controls)
 }
 
-// 改变蛇的移动方向的通用函数
-function changeDirection(newDirection) {
-  // 防止蛇反向移动（例如向右移动时不能直接向左转向）
-  const opposites = { up: 'down', down: 'up', left: 'right', right: 'left' }
-  if (opposites[newDirection] !== direction) {
-    direction = newDirection
-  }
-}
+// 导入方向控制函数
+import { changeDirection } from './controller.js'
 
-// 处理键盘按键事件
-function handleKeyPress(event) {
-  // 键盘按键映射到移动方向
-  const newDirection = {
-    'ArrowUp': 'up',
-    'ArrowDown': 'down',
-    'ArrowLeft': 'left',
-    'ArrowRight': 'right',
-    'w': 'up',
-    's': 'down',
-    'a': 'left',
-    'd': 'right'
-  }[event.key]
+// 导入键盘控制函数
+import { handleKeyPress } from './controller.js'
 
-  // 如果是有效的方向键，则改变方向
-  if (newDirection) {
-    const opposites = { up: 'down', down: 'up', left: 'right', right: 'left' }
-    if (opposites[newDirection] !== direction) {
-      direction = newDirection
-    }
-  }
-}
-
-// 游戏步骤，处理蛇的移动、碰撞检测和食物收集
 function gameStep() {
   const canvas = document.querySelector('canvas')
   const ctx = canvas.getContext('2d')
+
+  // 在移动前更新实际方向
+  direction = nextDirection;
 
   // 根据当前方向移动蛇头
   const head = { x: snake[0].x, y: snake[0].y }
@@ -474,28 +456,18 @@ function gameStep() {
     gameOver();
     return;
   }
-  
-  // 检查是否撞到自己或障碍物
-  if (
-    snake.some(segment => {
-      // 计算蛇身每个段与蛇头的中心点距离
-      const segmentCenterX = segment.x + GAME_CONFIG.gridSize / 2;
-      const segmentCenterY = segment.y + GAME_CONFIG.gridSize / 2;
-      const headCenterX = head.x + GAME_CONFIG.gridSize / 2;
-      const headCenterY = head.y + GAME_CONFIG.gridSize / 2;
-      return Math.abs(segmentCenterX - headCenterX) < GAME_CONFIG.gridSize / 2 &&
-             Math.abs(segmentCenterY - headCenterY) < GAME_CONFIG.gridSize / 2;
-    }) ||
-    obstacles.some(obstacle => {
-      // 计算障碍物与蛇头的中心点距离
-      const obstacleCenterX = obstacle.x + GAME_CONFIG.gridSize / 2;
-      const obstacleCenterY = obstacle.y + GAME_CONFIG.gridSize / 2;
-      const headCenterX = head.x + GAME_CONFIG.gridSize / 2;
-      const headCenterY = head.y + GAME_CONFIG.gridSize / 2;
-      return Math.abs(obstacleCenterX - headCenterX) < GAME_CONFIG.gridSize / 2 &&
-             Math.abs(obstacleCenterY - headCenterY) < GAME_CONFIG.gridSize / 2;
-    })
-  ) {
+
+  // 检查是否会撞到自己
+  const willCollideWithSelf = snake.slice(1).some(segment => {
+    return head.x === segment.x && head.y === segment.y;
+  });
+
+  // 检查是否会撞到障碍物
+  const willCollideWithObstacle = obstacles.some(obstacle => {
+    return head.x === obstacle.x && head.y === obstacle.y;
+  });
+
+  if (willCollideWithSelf || willCollideWithObstacle) {
     gameOver();
     return;
   }
@@ -503,18 +475,8 @@ function gameStep() {
   // 添加新头部
   snake.unshift(head)
 
-  // 检查是否吃到食物，使用更精确的碰撞检测
-  const collisionTolerance = GAME_CONFIG.gridSize / 3
-
-
-
-  // 在gameStep函数中，吃到食物时添加得分动画
-  if (
-    Math.abs((head.x + GAME_CONFIG.gridSize/2) - (food.x + GAME_CONFIG.gridSize/2)) < collisionTolerance &&
-    Math.abs((head.y + GAME_CONFIG.gridSize/2) - (food.y + GAME_CONFIG.gridSize/2)) < collisionTolerance
-  ) {
-
-
+  // 检查是否吃到食物
+  if (head.x === food.x && head.y === food.y) {
     // 播放吃食物音效
     soundManager.playSound(food.type === 'bonus' ? 'bonus' : 'eat')
     
@@ -576,9 +538,6 @@ function gameStep() {
     snake.pop()
   }
 
-  // 更新分数显示
-  updateScore()
-
   // 确保画布上下文状态正确
   ctx.imageSmoothingEnabled = true
   ctx.imageSmoothingQuality = 'high'
@@ -592,38 +551,16 @@ function gameOver(isComplete = false) {
   clearInterval(gameLoop)
   soundManager.playSound(isComplete ? 'bonus' : 'crash')
   
-  // 创建游戏结束面板
-  const gameOverPanel = document.createElement('div')
-  gameOverPanel.className = 'game-over'
+  // 获取上次保存的关卡
+  const savedLevel = parseInt(localStorage.getItem('lastLevel')) || 1
   
-  let controlsHtml = GAME_CONFIG.isMobile ?
-    '<div class="game-over-controls"><button class="restart-btn">重新开始</button><button class="menu-btn">返回菜单</button></div>' :
-    '<p>按空格键重新开始</p><p>按ESC键返回模式选择</p>'
-
-  if (GAME_CONFIG.gameMode === 'levels') {
-    if (isComplete) {
-      gameOverPanel.innerHTML = `
-        <h2>恭喜通关全部关卡！</h2>
-        <p>最终得分: ${score}</p>
-        <p>最高分: ${highScore}</p>
-        ${controlsHtml}
-      `
-    } else {
-      gameOverPanel.innerHTML = `
-        <h2>第${GAME_CONFIG.currentLevel}关失败!</h2>
-        <p>本关得分: ${score}</p>
-        <p>最高分: ${highScore}</p>
-        ${controlsHtml}
-      `
-    }
-  } else {
-    gameOverPanel.innerHTML = `
-      <h2>游戏结束!</h2>
-      <p>最终得分: ${score}</p>
-      <p>最高分: ${highScore}</p>
-      ${controlsHtml}
-    `
+  // 在游戏结束时保存当前关卡进度
+  if (GAME_CONFIG.gameMode === 'levels' && !isComplete) {
+    localStorage.setItem('lastLevel', GAME_CONFIG.currentLevel)
   }
+  
+  // 创建游戏结束面板
+  const gameOverPanel = createGameOverPanel(score, highScore, GAME_CONFIG, isComplete)
   
   document.querySelector('#app').appendChild(gameOverPanel)
 
@@ -634,7 +571,12 @@ function gameOver(isComplete = false) {
 
     restartBtn.addEventListener('click', () => {
       gameOverPanel.remove()
+      // 在闯关模式下保持当前关卡，默认模式则重置到第一关
+      if (GAME_CONFIG.gameMode !== 'levels') {
+        GAME_CONFIG.currentLevel = 1
+      }
       direction = 'right'
+      nextDirection = 'right'
       initGame()
     })
 
@@ -649,7 +591,12 @@ function gameOver(isComplete = false) {
         document.removeEventListener('keydown', restartHandler)
         const gameOverPanel = document.querySelector('.game-over')
         if (gameOverPanel) gameOverPanel.remove()
+        // 在闯关模式下保持当前关卡，默认模式则重置到第一关
+        if (GAME_CONFIG.gameMode !== 'levels') {
+          GAME_CONFIG.currentLevel = 1
+        }
         direction = 'right'
+        nextDirection = 'right'
         initGame()
       } else if (event.code === 'Escape') {
         document.removeEventListener('keydown', restartHandler)
