@@ -12,7 +12,7 @@ export const GAME_CONFIG = {
   gridSize: 20,
   
   // 蛇的初始长度 - 游戏开始时蛇的身体段数
-  initialSnakeLength: 3,
+  initialSnakeLength: 6,
   
   // 游戏速度相关设置
   initialGameSpeed: 200,       // 初始移动间隔(毫秒)，数值越小移动越快

@@ -1,9 +1,10 @@
 import './style.css'
 import { soundManager } from './sounds.js'
-import foodIcons from './foodIcons.js'
-import obstacleIcons from './obstacleIcons.js'
+import { foodIcons, obstacleIcons } from './assets.js'
 import { render } from './renderer.js'
 import { adjustCanvasSize, createGameLayout, createModeSelection, createContinueGameModal, createGameOverPanel, updateScoreBoard } from './layout.js'
+// 导入碰撞检测模块
+ import { checkBoundaryCollision, checkSelfCollision, checkObstacleCollision } from './collision.js';
 
 // 游戏配置对象，包含所有游戏相关的参数设置
 const GAME_CONFIG = {
@@ -160,6 +161,8 @@ window.addEventListener('resize', () => {
 })
 
 // 初始化游戏
+let handleKeyDown; // 将handleKeyDown声明为全局变量
+
 function initGame() {
   // 初始化时调整画布大小
   adjustCanvasSize(GAME_CONFIG)
@@ -199,10 +202,9 @@ function initGame() {
   } else {
     // 添加按键冷却时间变量
     let lastKeyPressTime = 0;
-
     const KEY_COOLDOWN = 50; // 设置50毫秒的按键冷却时间
 
-    document.addEventListener('keydown', (event) => {
+    handleKeyDown = (event) => {
       const currentTime = Date.now();
       // 检查是否超过冷却时间
       if (currentTime - lastKeyPressTime < KEY_COOLDOWN) {
@@ -213,7 +215,9 @@ function initGame() {
       if (newDirection) {
         nextDirection = newDirection;
       }
-    })
+    };
+
+    document.addEventListener('keydown', handleKeyDown)
   }
 }
 
@@ -224,8 +228,13 @@ function updateScore() {
 
 // 生成障碍物
 function generateObstacles() {
-  // 默认模式下不生成障碍物
+  // 默认模式下返回空的障碍物数组，边界将通过CSS边框显示
   if (GAME_CONFIG.gameMode === 'default') {
+    // 设置画布边框样式
+    const canvas = document.querySelector('canvas');
+    if (canvas) {
+      canvas.style.border = '2px solid rgba(255, 0, 0, 0.3)';
+    }
     return [];
   }
 
@@ -319,6 +328,9 @@ function generateFood() {
 
 // 处理键盘输入
 // 初始化触摸控制
+// 存储事件处理函数的引用
+let handleTouchStart, handleTouchMove, handleTouchEnd;
+
 function initTouchControls() {
   let touchStartX = 0
   let touchStartY = 0
@@ -327,7 +339,7 @@ function initTouchControls() {
   let longPressTimer = null
   const minSwipeDistance = 30
 
-  document.addEventListener('touchstart', (e) => {
+  handleTouchStart = (e) => {
     touchStartX = e.touches[0].clientX
     touchStartY = e.touches[0].clientY
     touchStartTime = Date.now()
@@ -348,15 +360,15 @@ function initTouchControls() {
         }
       }
     }, GAME_CONFIG.touchSpeedBoost.minTouchDuration)
-  })
+  }
 
-  document.addEventListener('touchmove', (e) => {
+  handleTouchMove = (e) => {
     e.preventDefault()
     // 如果是长按状态，取消滑动方向改变
     if (isLongPress) return
-  }, { passive: false })
+  }
 
-  document.addEventListener('touchend', (e) => {
+  handleTouchEnd = (e) => {
     // 清除长按计时器
     if (longPressTimer) {
       clearTimeout(longPressTimer)
@@ -390,7 +402,11 @@ function initTouchControls() {
       }
       nextDirection = changeDirection(newDirection, direction)
     }
-  })
+  }
+
+  document.addEventListener('touchstart', handleTouchStart)
+  document.addEventListener('touchmove', handleTouchMove, { passive: false })
+  document.addEventListener('touchend', handleTouchEnd)
 }
 
 // 创建虚拟方向按钮（用于移动端）
@@ -439,35 +455,22 @@ function gameStep() {
     case 'right': head.x += GAME_CONFIG.gridSize; break
   }
 
-  // 处理边界碰撞
-  if (GAME_CONFIG.wallPassEnabled) {
-    // 穿墙模式：从一边穿过到另一边
-    if (head.x < 0) head.x = GAME_CONFIG.canvasWidth - GAME_CONFIG.gridSize;
-    if (head.x >= GAME_CONFIG.canvasWidth) head.x = 0;
-    if (head.y < 0) head.y = GAME_CONFIG.canvasHeight - GAME_CONFIG.gridSize;
-    if (head.y >= GAME_CONFIG.canvasHeight) head.y = 0;
-  } else if (
-    // 非穿墙模式：碰到边界游戏结束
-    head.x < 0 ||
-    head.x >= GAME_CONFIG.canvasWidth ||
-    head.y < 0 ||
-    head.y >= GAME_CONFIG.canvasHeight
-  ) {
+
+  // 处理边界和碰撞检测
+  const { nextHeadX, nextHeadY, isCollided } = checkBoundaryCollision(head, GAME_CONFIG);
+  
+  // 如果发生边界碰撞且不是穿墙模式，游戏结束
+  if (isCollided && !GAME_CONFIG.wallPassEnabled) {
     gameOver();
     return;
   }
 
-  // 检查是否会撞到自己
-  const willCollideWithSelf = snake.slice(1).some(segment => {
-    return head.x === segment.x && head.y === segment.y;
-  });
+  // 更新头部位置
+  head.x = nextHeadX;
+  head.y = nextHeadY;
 
-  // 检查是否会撞到障碍物
-  const willCollideWithObstacle = obstacles.some(obstacle => {
-    return head.x === obstacle.x && head.y === obstacle.y;
-  });
-
-  if (willCollideWithSelf || willCollideWithObstacle) {
+  // 检查是否会撞到自己或障碍物
+  if (checkSelfCollision(head, snake) || checkObstacleCollision(head, obstacles)) {
     gameOver();
     return;
   }
@@ -483,8 +486,10 @@ function gameStep() {
     // 根据食物类型增加分数和特殊效果
     if (food.type === 'double') {
       score += food.points * 2  // 双倍积分
+      updateScore()  // 更新分数显示
     } else if (food.type === 'speed') {
       score += food.points
+      updateScore()  // 更新分数显示
       // 使用平滑的速度增长算法
       const speedIncrease = Math.floor(score / GAME_CONFIG.speedIncreaseInterval) * GAME_CONFIG.speedIncreaseAmount
       const newSpeed = Math.max(GAME_CONFIG.minGameSpeed, GAME_CONFIG.initialGameSpeed - speedIncrease)
@@ -495,6 +500,7 @@ function gameStep() {
       }
     } else if (food.type === 'slow') {
       score += food.points
+      updateScore()  // 更新分数显示
       // 限制减速效果，确保游戏节奏不会过慢
       const maxSlowSpeed = GAME_CONFIG.initialGameSpeed * 1.2
       const newSpeed = Math.min(maxSlowSpeed, currentGameSpeed + GAME_CONFIG.speedIncreaseAmount)
@@ -505,6 +511,7 @@ function gameStep() {
       }
     } else {
       score += food.points
+      updateScore()  // 更新分数显示
     }
     
     // 更新最高分
@@ -546,9 +553,22 @@ function gameStep() {
   render(ctx, snake, food, obstacles, GAME_CONFIG, foodIcons, obstacleIcons)
 }
 
-// 游戏结束
 function gameOver(isComplete = false) {
-  clearInterval(gameLoop)
+  // 清除游戏循环
+  if (gameLoop) {
+    clearInterval(gameLoop)
+    gameLoop = null
+  }
+  
+  // 移除所有事件监听器
+  if (GAME_CONFIG.isMobile) {
+    document.removeEventListener('touchstart', handleTouchStart)
+    document.removeEventListener('touchmove', handleTouchMove)
+    document.removeEventListener('touchend', handleTouchEnd)
+  } else {
+    document.removeEventListener('keydown', handleKeyDown)
+  }
+  
   soundManager.playSound(isComplete ? 'bonus' : 'crash')
   
   // 获取上次保存的关卡

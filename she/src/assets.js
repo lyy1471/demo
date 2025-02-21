@@ -1,5 +1,7 @@
+// 游戏资源配置
+
 // 食物图标配置
-const foodIcons = {
+export const foodIcons = {
   normal: {
     emoji: '🍎',  // 普通食物 - 苹果
     size: 16
@@ -22,4 +24,10 @@ const foodIcons = {
   }
 }
 
-export default foodIcons
+// 障碍物图标配置
+export const obstacleIcons = {
+  rock: {
+    emoji: '🪨',  // 石头
+    size: 18     // 增大尺寸以匹配网格大小
+  }
+}

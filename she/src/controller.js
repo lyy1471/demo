@@ -48,9 +48,9 @@ export function initTouchControls(gameLoop, currentGameSpeed, GAME_CONFIG, gameS
 
     // 设置新的长按计时器
     longPressTimer = setTimeout(() => {
-      if (touchStartTime) {
+      if (touchStartTime && !isLongPress) {
         isLongPress = true
-        if (GAME_CONFIG.touchSpeedBoost.enabled) {
+        if (GAME_CONFIG.touchSpeedBoost.enabled && !GAME_CONFIG.normalSpeed) {
           GAME_CONFIG.normalSpeed = currentGameSpeed
           currentGameSpeed = GAME_CONFIG.touchSpeedBoost.boostSpeed
           clearInterval(gameLoop)
@@ -79,7 +79,7 @@ export function initTouchControls(gameLoop, currentGameSpeed, GAME_CONFIG, gameS
     const deltaY = touchEndY - touchStartY
 
     // 恢复正常速度
-    if (GAME_CONFIG.touchSpeedBoost.enabled && GAME_CONFIG.normalSpeed) {
+    if (isLongPress && GAME_CONFIG.touchSpeedBoost.enabled) {
       currentGameSpeed = GAME_CONFIG.normalSpeed
       GAME_CONFIG.normalSpeed = null
       clearInterval(gameLoop)

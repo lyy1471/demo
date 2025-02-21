@@ -7,17 +7,47 @@ export function adjustCanvasSize(GAME_CONFIG) {
   const isPortrait = screenHeight > screenWidth
   const padding = 20
   
+  // 计算基础尺寸
+  let baseWidth, baseHeight
+  
   if (GAME_CONFIG.isMobile) {
-    // 根据屏幕方向调整画布尺寸
     if (isPortrait) {
-      GAME_CONFIG.canvasWidth = Math.min(screenWidth - padding * 2, 400)
-      GAME_CONFIG.canvasHeight = Math.min(screenHeight * 0.6, 600)
+      // 竖屏模式：使用屏幕宽度作为基准
+      baseWidth = Math.min(screenWidth - padding * 2, 400)
+      // 保持合适的宽高比
+      baseHeight = Math.min(baseWidth * 1.5, screenHeight * 0.6)
     } else {
-      GAME_CONFIG.canvasWidth = Math.min(screenWidth * 0.7, 600)
-      GAME_CONFIG.canvasHeight = Math.min(screenHeight - padding * 2, 400)
+      // 横屏模式：使用屏幕高度作为基准
+      baseHeight = Math.min(screenHeight - padding * 2, 400)
+      // 保持合适的宽高比
+      baseWidth = Math.min(baseHeight * 1.5, screenWidth * 0.7)
     }
-    // 确保网格大小适配屏幕
-    GAME_CONFIG.gridSize = Math.max(Math.floor(GAME_CONFIG.canvasWidth / 30), 15)
+    
+    // 确保尺寸为偶数，便于网格对齐
+    GAME_CONFIG.canvasWidth = Math.floor(baseWidth / 2) * 2
+    GAME_CONFIG.canvasHeight = Math.floor(baseHeight / 2) * 2
+    
+    // 根据画布尺寸计算合适的网格大小
+    const minGridSize = 15
+    const maxGridSize = 25
+    const idealGridCount = 20 // 理想的网格数量
+    
+    // 计算网格大小，确保网格数量适中
+    const gridSizeFromWidth = Math.floor(GAME_CONFIG.canvasWidth / idealGridCount)
+    const gridSizeFromHeight = Math.floor(GAME_CONFIG.canvasHeight / idealGridCount)
+    
+    // 选择合适的网格大小
+    GAME_CONFIG.gridSize = Math.min(
+      Math.max(
+        Math.min(gridSizeFromWidth, gridSizeFromHeight),
+        minGridSize
+      ),
+      maxGridSize
+    )
+    
+    // 调整画布尺寸以适应网格
+    GAME_CONFIG.canvasWidth = Math.floor(GAME_CONFIG.canvasWidth / GAME_CONFIG.gridSize) * GAME_CONFIG.gridSize
+    GAME_CONFIG.canvasHeight = Math.floor(GAME_CONFIG.canvasHeight / GAME_CONFIG.gridSize) * GAME_CONFIG.gridSize
   }
 }
 
@@ -38,15 +68,40 @@ export function createGameLayout(GAME_CONFIG) {
   ctx.imageSmoothingEnabled = true
   ctx.imageSmoothingQuality = 'high'
   
-  // 创建计分板
+  // 创建计分板，根据屏幕方向调整位置
   const scoreBoard = document.createElement('div')
   scoreBoard.className = 'score-board'
   
+  // 根据屏幕方向调整计分板位置
+  const isPortrait = window.innerHeight > window.innerWidth
+  if (isPortrait) {
+    scoreBoard.style.position = 'fixed'
+    scoreBoard.style.top = '10px'
+    scoreBoard.style.right = '10px'
+    scoreBoard.style.transform = 'none'
+    scoreBoard.style.width = 'auto'
+    scoreBoard.style.maxWidth = '150px'
+  } else {
+    scoreBoard.style.position = 'fixed'
+    scoreBoard.style.top = '20px'
+    scoreBoard.style.right = '20px'
+    scoreBoard.style.transform = 'none'
+  }
+  
   // 清空并添加游戏元素
-  document.querySelector('#app').innerHTML = ''
-  document.querySelector('#app').appendChild(title)
-  document.querySelector('#app').appendChild(canvas)
-  document.querySelector('#app').appendChild(scoreBoard)
+  const app = document.querySelector('#app')
+  app.innerHTML = ''
+  app.style.position = 'relative'
+  app.style.width = '100%'
+  app.style.height = '100vh'
+  app.style.display = 'flex'
+  app.style.flexDirection = 'column'
+  app.style.justifyContent = 'center'
+  app.style.alignItems = 'center'
+  
+  app.appendChild(title)
+  app.appendChild(canvas)
+  app.appendChild(scoreBoard)
 
   return { canvas, ctx, scoreBoard }
 }
@@ -69,6 +124,22 @@ export function createModeSelection() {
     <button class="mode-btn" data-mode="default">默认模式</button>
     <button class="mode-btn" data-mode="levels">闯关模式</button>
   `
+
+  // 添加背景蛇元素
+  const backgroundSnake = document.createElement('div')
+  backgroundSnake.className = 'background-snake'
+  
+  // 添加多个蛇头
+  for (let i = 0; i < 5; i++) {
+    const snakeHead = document.createElement('div')
+    snakeHead.className = 'background-snake-head'
+    snakeHead.style.animationDelay = `${i * 0.3}s`
+    snakeHead.style.left = `${Math.random() * 80}%`
+    snakeHead.style.top = `${Math.random() * 80}%`
+    backgroundSnake.appendChild(snakeHead)
+  }
+  
+  app.appendChild(backgroundSnake)
 
   app.appendChild(modeContainer)
   return modeContainer
