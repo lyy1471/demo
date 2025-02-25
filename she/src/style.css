@@ -33,10 +33,23 @@ canvas {
 }
 
 .game-title {
+  position: fixed;
+  /* top: 2vh; */
+  left: 50%;
+  transform: translateX(-50%);
   color: #fff;
   font-size: clamp(2em, 6vw, 3.5em);
   text-shadow: 0 0 15px rgba(255, 255, 255, 0.6);
-  margin-top: 10vh;
+  text-align: center;
+  z-index: 1001;
+  width: 100%;
+  pointer-events: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  pointer-events: none;
+  margin-bottom: 20px;
+  position: relative;
   margin-bottom: 20px;
   text-align: center;
   position: relative;

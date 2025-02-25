@@ -3,6 +3,9 @@ import { soundManager } from './sounds.js'
 import { foodIcons, obstacleIcons } from './assets.js'
 import { render } from './renderer.js'
 import { adjustCanvasSize, createGameLayout, createModeSelection, createContinueGameModal, createGameOverPanel, updateScoreBoard } from './layout.js'
+
+// 初始化vConsole
+const vConsole = new VConsole()
 // 导入碰撞检测模块
  import { checkBoundaryCollision, checkSelfCollision, checkObstacleCollision } from './collision.js';
 
