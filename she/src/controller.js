@@ -1,6 +1,15 @@
-// 游戏控制器模块
+// 游戏控制器模块 - 负责处理用户输入和游戏控制
 
-// 改变蛇的移动方向的通用函数
+/**
+ * 改变蛇的移动方向
+ * @param {string} newDirection - 新的移动方向
+ * @param {string} currentDirection - 当前移动方向
+ * @returns {string} 最终的移动方向
+ * 实现细节：
+ * 1. 防止蛇反向移动（例如向右移动时不能直接向左转向）
+ * 2. 验证新方向的有效性
+ * 3. 确保平滑的方向转换
+ */
 export function changeDirection(newDirection, currentDirection) {
   // 防止蛇反向移动（例如向右移动时不能直接向左转向）
   const opposites = { up: 'down', down: 'up', left: 'right', right: 'left' }
@@ -10,7 +19,16 @@ export function changeDirection(newDirection, currentDirection) {
   return currentDirection
 }
 
-// 处理键盘按键事件
+/**
+ * 处理键盘按键事件
+ * @param {KeyboardEvent} event - 键盘事件对象
+ * @param {string} currentDirection - 当前移动方向
+ * @returns {string} 根据按键确定的新方向
+ * 实现细节：
+ * 1. 支持方向键和WASD按键
+ * 2. 将按键映射到移动方向
+ * 3. 确保方向改变的有效性
+ */
 export function handleKeyPress(event, currentDirection) {
   // 键盘按键映射到移动方向
   const newDirection = {
@@ -28,7 +46,18 @@ export function handleKeyPress(event, currentDirection) {
   return changeDirection(newDirection, currentDirection)
 }
 
-// 初始化触摸控制
+/**
+ * 初始化触摸控制
+ * @param {number} gameLoop - 游戏循环计时器ID
+ * @param {number} currentGameSpeed - 当前游戏速度
+ * @param {Object} GAME_CONFIG - 游戏配置对象
+ * @param {Function} gameStep - 游戏步进函数
+ * 实现细节：
+ * 1. 处理触摸开始、移动和结束事件
+ * 2. 支持滑动控制方向
+ * 3. 实现长按加速功能
+ * 4. 确保触摸控制的响应性和准确性
+ */
 export function initTouchControls(gameLoop, currentGameSpeed, GAME_CONFIG, gameStep) {
   let touchStartX = 0
   let touchStartY = 0
@@ -103,7 +132,15 @@ export function initTouchControls(gameLoop, currentGameSpeed, GAME_CONFIG, gameS
   })
 }
 
-// 创建虚拟方向按钮（用于移动端）
+/**
+ * 创建虚拟方向按钮
+ * @param {Function} onDirectionChange - 方向改变时的回调函数
+ * @returns {HTMLElement} 虚拟控制按钮容器
+ * 实现细节：
+ * 1. 创建虚拟方向按钮UI
+ * 2. 添加触摸事件处理
+ * 3. 确保按钮布局合理且易于操作
+ */
 export function createVirtualControls(onDirectionChange) {
   const controls = document.createElement('div')
   controls.className = 'virtual-controls'
