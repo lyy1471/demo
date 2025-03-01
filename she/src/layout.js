@@ -64,7 +64,9 @@ export function createGameLayout(GAME_CONFIG) {
   // 创建游戏标题 - 根据游戏模式显示不同标题
   const title = document.createElement('h1')
   title.className = 'game-title'
-  title.textContent = GAME_CONFIG.gameMode === 'levels' ? `贪吃蛇 - 第${GAME_CONFIG.currentLevel}关` : '贪吃蛇'
+  title.innerHTML = GAME_CONFIG.gameMode === 'levels' ? 
+    `贪吃蛇<br>第${GAME_CONFIG.currentLevel}关` : 
+    '贪吃蛇'
   
   // 创建游戏画布 - 设置尺寸和渲染属性
   const canvas = document.createElement('canvas')
