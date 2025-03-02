@@ -1,13 +1,13 @@
-import './style.css'
-import { soundManager } from './sounds.js'
-import { foodIcons, obstacleIcons } from './assets.js'
-import { render } from './renderer.js'
-import { adjustCanvasSize, createGameLayout, createModeSelection, createContinueGameModal, createGameOverPanel, updateScoreBoard } from './layout.js'
+import './assets/style.css'
+import { soundManager } from './assets/sounds.js'
+import { foodIcons, obstacleIcons } from './assets/assets.js'
+import { render } from './ui/renderer.js'
+import { adjustCanvasSize, createGameLayout, createModeSelection, createContinueGameModal, createGameOverPanel, updateScoreBoard } from './ui/layout.js'
 
 // 初始化vConsole
 const vConsole = new VConsole()
 // 导入碰撞检测模块
- import { checkBoundaryCollision, checkSelfCollision, checkObstacleCollision } from './collision.js';
+import { checkBoundaryCollision, checkSelfCollision, checkObstacleCollision } from './core/collision.js';
 
 // 游戏配置对象，包含所有游戏相关的参数设置
 const GAME_CONFIG = {
@@ -437,10 +437,10 @@ function createVirtualControls() {
 }
 
 // 导入方向控制函数
-import { changeDirection } from './controller.js'
+import { changeDirection } from './ui/controller.js'
 
 // 导入键盘控制函数
-import { handleKeyPress } from './controller.js'
+import { handleKeyPress } from './ui/controller.js'
 
 function gameStep() {
   const canvas = document.querySelector('canvas')
