@@ -73,38 +73,44 @@ class _SnakeGameWidgetState extends State<SnakeGameWidget> {
         autofocus: true,
         onKeyEvent: onKeyEvent,
         child: Scaffold(
-        backgroundColor: Colors.grey[200],
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+          backgroundColor: Colors.grey[200],
+          body: Stack(
             children: [
-              if (showMenu) ...[_buildMenu()] else ...[_buildGame()],
+              const MenuSnake(),
+              Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (showMenu) ...[
+                      _buildMenu(),
+                    ] else ...[
+                      _buildGame(),
+                    ],
+                  ],
+                ),
+              )
             ],
           ),
         ),
       ),
-    ),
     );
   }
 
   Widget _buildMenu() {
-    return Stack(
-      children: [
-        const MenuSnake(),
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.9),
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 10,
-                offset: const Offset(0, 5),
-              ),
-            ],
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.9),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
           ),
-          child: Column(
+        ],
+      ),
+      child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
@@ -132,8 +138,6 @@ class _SnakeGameWidgetState extends State<SnakeGameWidget> {
           ),
         ],
       ),
-    ),
-      ],
     );
   }
 
@@ -182,19 +186,68 @@ class _SnakeGameWidgetState extends State<SnakeGameWidget> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            '分数: ${game.score}',
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          _buildInfoItem(
+            icon: Icons.star,
+            label: '分数',
+            value: '${game.score}',
           ),
           if (game.gameMode == GameMode.challenge) ...[
             const SizedBox(width: 20),
-            Text(
-              '关卡: ${game.currentLevel}',
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            _buildInfoItem(
+              icon: Icons.flag,
+              label: '关卡',
+              value: '${game.currentLevel}',
+            ),
+            const SizedBox(width: 20),
+            _buildInfoItem(
+              icon: Icons.arrow_circle_up,
+              label: '过关分数',
+              value: '${game.currentLevel * 50}',
+              valueColor: game.score >= game.currentLevel * 50 ? Colors.green : null,
             ),
           ],
         ],
       ),
+    );
+  }
+
+  Widget _buildInfoItem({
+    required IconData icon,
+    required String label,
+    required String value,
+    Color? valueColor,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          icon,
+          size: 20,
+          color: Colors.deepPurple,
+        ),
+        const SizedBox(width: 8),
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                color: Colors.grey,
+              ),
+            ),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: valueColor,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -213,11 +266,17 @@ class _SnakeGameWidgetState extends State<SnakeGameWidget> {
       ),
       child: AspectRatio(
         aspectRatio: 1,
-        child: CustomPaint(
-          painter: SnakeGamePainter(
-            game: game,
-            gridSize: game.gridSize,
-          ),
+        child: AnimatedBuilder(
+          animation: const AlwaysStoppedAnimation(0),
+          builder: (context, child) {
+            return CustomPaint(
+              painter: SnakeGamePainter(
+                game: game,
+                gridSize: game.gridSize,
+                currentTime: DateTime.now(),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -312,8 +371,13 @@ class SnakeGamePainter extends CustomPainter {
   final SnakeGame game;
   final int gridSize;
   final double cellPadding = 1.0;
+  final double animationValue;
 
-  SnakeGamePainter({required this.game, required this.gridSize});
+  SnakeGamePainter({
+    required this.game, 
+    required this.gridSize,
+    DateTime? currentTime,
+  }) : animationValue = sin((currentTime ?? DateTime.now()).millisecondsSinceEpoch / 500) * 0.05;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -322,203 +386,213 @@ class SnakeGamePainter extends CustomPainter {
     // 绘制网格背景
     final bgPaint = Paint()
       ..shader = LinearGradient(
+        colors: [
+          Colors.green[50]!,
+          Colors.green[100]!,
+        ],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
-        colors: [
-          Colors.grey[50]!,
-          Colors.grey[100]!,
-        ],
       ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
     canvas.drawRect(Offset.zero & size, bgPaint);
 
-    // 绘制障碍物
-    final obstaclePaint = Paint()
-      ..color = Colors.pink[100]!
-      ..style = PaintingStyle.fill
-      ..strokeWidth = 2.0;
+    // 检查游戏状态
+    if (!game.isInitialized) return;
+
+    // 绘制食物 (苹果样式)
+    if (game.food != null) {
+      final foodCenter = Offset(
+        game.food!.x * cellSize + cellSize / 2,
+        game.food!.y * cellSize + cellSize / 2 + animationValue * cellSize,
+      );
+
+      // 绘制苹果主体
+      final applePaint = Paint()
+        ..color = Colors.red
+        ..style = PaintingStyle.fill;
+
+      final appleSize = cellSize * 0.7;
+
+      // 绘制苹果身体
+      final applePath = Path()
+        ..moveTo(foodCenter.dx, foodCenter.dy - appleSize / 2)
+        ..quadraticBezierTo(foodCenter.dx + appleSize / 2, foodCenter.dy - appleSize / 2, foodCenter.dx + appleSize / 2, foodCenter.dy)
+        ..quadraticBezierTo(foodCenter.dx + appleSize / 2, foodCenter.dy + appleSize / 2, foodCenter.dx, foodCenter.dy + appleSize / 2)
+        ..quadraticBezierTo(foodCenter.dx - appleSize / 2, foodCenter.dy + appleSize / 2, foodCenter.dx - appleSize / 2, foodCenter.dy)
+        ..quadraticBezierTo(
+            foodCenter.dx - appleSize / 2, foodCenter.dy - appleSize / 2, foodCenter.dx, foodCenter.dy - appleSize / 2);
+
+      canvas.drawPath(applePath, applePaint);
+
+      // 绘制苹果茎
+      final stemPaint = Paint()
+        ..color = Colors.brown
+        ..strokeWidth = 2
+        ..style = PaintingStyle.stroke;
+
+      canvas.drawLine(
+          Offset(foodCenter.dx, foodCenter.dy - appleSize / 2), Offset(foodCenter.dx, foodCenter.dy - appleSize / 2 - 5), stemPaint);
+    }
+
+    // 绘制障碍物 (岩石样式)
     for (var obstacle in game.obstacles) {
-      // 绘制可爱的心形障碍物
-      final path = Path();
-      final centerX = obstacle.x * cellSize + cellSize / 2;
-      final centerY = obstacle.y * cellSize + cellSize / 2;
-      final size = cellSize * 0.4;
-
-      path.moveTo(centerX, centerY + size * 0.25);
-      path.cubicTo(
-        centerX - size, centerY - size * 0.5,
-        centerX - size, centerY - size * 1.5,
-        centerX, centerY - size * 0.5
-      );
-      path.cubicTo(
-        centerX + size, centerY - size * 1.5,
-        centerX + size, centerY - size * 0.5,
-        centerX, centerY + size * 0.25
-      );
-
-      canvas.drawPath(path, obstaclePaint);
-    }
-
-    // 绘制食物
-    final foodPaint = Paint()
-      ..color = Colors.pink[300]!
-      ..style = PaintingStyle.fill;
-
-    // 绘制可爱的星形食物
-    final foodCenter = Offset(
-      game.food.x * cellSize + cellSize / 2,
-      game.food.y * cellSize + cellSize / 2,
-    );
-    final foodSize = cellSize * 0.4;
-    final foodPath = Path();
-    for (var i = 0; i < 5; i++) {
-      final angle = -pi / 2 + 2 * pi * i / 5;
-      final point = Offset(
-        foodCenter.dx + cos(angle) * foodSize,
-        foodCenter.dy + sin(angle) * foodSize,
-      );
-      if (i == 0) {
-        foodPath.moveTo(point.dx, point.dy);
-      } else {
-        foodPath.lineTo(point.dx, point.dy);
+      if (obstacle != null) {
+        final centerX = obstacle.x * cellSize + cellSize / 2;
+        final centerY = obstacle.y * cellSize + cellSize / 2;
+        
+        final rockPaint = Paint()
+          ..shader = RadialGradient(
+            colors: [
+              Colors.grey[400]!,
+              Colors.grey[600]!,
+            ],
+          ).createShader(Rect.fromCircle(
+            center: Offset(centerX, centerY),
+            radius: cellSize / 2,
+          ));
+        
+        // 使用固定形状而不是随机形状
+        final rockPath = Path();
+        final radius = cellSize * 0.4;
+        final points = 8;
+        
+        // 使用固定的variance值而不是随机值
+        for (var i = 0; i < points; i++) {
+          final angle = (i * 2 * pi / points) - pi / 2;
+          // 为每个顶点使用固定的不规则值
+          final variance = 0.9 + (i % 3) * 0.1;
+          final x = centerX + cos(angle) * radius * variance;
+          final y = centerY + sin(angle) * radius * variance;
+          
+          if (i == 0) {
+            rockPath.moveTo(x, y);
+          } else {
+            rockPath.lineTo(x, y);
+          }
+        }
+        rockPath.close();
+        canvas.drawPath(rockPath, rockPaint);
       }
-      final innerAngle = angle + pi / 5;
-      final innerPoint = Offset(
-        foodCenter.dx + cos(innerAngle) * (foodSize * 0.4),
-        foodCenter.dy + sin(innerAngle) * (foodSize * 0.4),
-      );
-      foodPath.lineTo(innerPoint.dx, innerPoint.dy);
     }
-    foodPath.close();
-    canvas.drawPath(foodPath, foodPaint);
+    
 
     // 绘制蛇身
-    for (var i = 1; i < game.snake.length; i++) {
-      final point = game.snake[i];
-      final colorIntensity = (i / game.snake.length) * 100;
-      final snakeGradient = LinearGradient(
-        colors: [
-          Colors.pink[max(100, 300 - (i * 20))]!,
-          Colors.pink[max(50, 200 - (i * 15))]!,
-        ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      );
-      
-      final snakeBodyPaint = Paint()
-        ..shader = snakeGradient.createShader(
-          Rect.fromLTWH(
-            point.x * cellSize,
-            point.y * cellSize,
-            cellSize,
-            cellSize,
-          ),
-        )
-        ..style = PaintingStyle.fill;
+    if (game.snake != null && game.snake.isNotEmpty) {
+      for (var i = 1; i < game.snake.length; i++) {
+        final point = game.snake[i];
+        if (point != null) {
+          final snakeBodyPaint = Paint()
+            ..shader = RadialGradient(
+              colors: [
+                Colors.green[300]!,
+                Colors.green[500]!,
+              ],
+              center: Alignment.topLeft,
+            ).createShader(Rect.fromCircle(
+              center: Offset(
+                point.x * cellSize + cellSize / 2,
+                point.y * cellSize + cellSize / 2,
+              ),
+              radius: cellSize / 2,
+            ));
 
-      // 绘制身体主体
-      canvas.drawCircle(
-        Offset(
-          point.x * cellSize + cellSize / 2,
-          point.y * cellSize + cellSize / 2,
-        ),
-        cellSize / 2 - cellPadding,
-        snakeBodyPaint,
-      );
+          // 绘制圆形身体段
+          canvas.drawCircle(
+            Offset(
+              point.x * cellSize + cellSize / 2,
+              point.y * cellSize + cellSize / 2,
+            ),
+            cellSize / 2 - cellPadding,
+            snakeBodyPaint,
+          );
 
-      // 添加高光效果
-      final highlightPaint = Paint()
-        ..color = Colors.white.withOpacity(0.3)
-        ..style = PaintingStyle.fill;
-      canvas.drawCircle(
-        Offset(
-          point.x * cellSize + cellSize * 0.35,
-          point.y * cellSize + cellSize * 0.35,
-        ),
-        cellSize / 6,
-        highlightPaint,
-      );
-    }
+          // 添加高光效果
+          final highlightPaint = Paint()
+            ..color = Colors.white.withOpacity(0.3)
+            ..style = PaintingStyle.fill;
+          canvas.drawCircle(
+            Offset(
+              point.x * cellSize + cellSize * 0.3,
+              point.y * cellSize + cellSize * 0.3,
+            ),
+            cellSize / 6,
+            highlightPaint,
+          );
+        }
+      }
 
-    // 绘制蛇头
-    final head = game.snake.first;
-    final headGradient = LinearGradient(
-      colors: [
-        Colors.pink[300]!,
-        Colors.pink[200]!,
-      ],
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-    );
+      // 绘制蛇头
+      final head = game.snake.first;
+      if (head != null) {
+        final headCenter = Offset(
+          head.x * cellSize + cellSize / 2,
+          head.y * cellSize + cellSize / 2,
+        );
 
-    final snakeHeadPaint = Paint()
-      ..shader = headGradient.createShader(
-        Rect.fromLTWH(
-          head.x * cellSize,
-          head.y * cellSize,
-          cellSize,
-          cellSize,
-        ),
-      )
-      ..style = PaintingStyle.fill;
+        // 绘制头部主体
+        final headPaint = Paint()
+          ..shader = RadialGradient(
+            colors: [
+              Colors.green[400]!,
+              Colors.green[600]!,
+            ],
+          ).createShader(Rect.fromCircle(
+            center: headCenter,
+            radius: cellSize / 2,
+          ));
 
-    // 绘制头部主体
-    canvas.drawCircle(
-      Offset(
-        head.x * cellSize + cellSize / 2,
-        head.y * cellSize + cellSize / 2,
-      ),
-      cellSize / 2 - cellPadding,
-      snakeHeadPaint,
-    );
+        canvas.drawCircle(
+          headCenter,
+          cellSize / 2 - cellPadding,
+          headPaint,
+        );
 
-    // 添加头部高光
-    final headHighlightPaint = Paint()
-      ..color = Colors.white.withOpacity(0.4)
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(
-      Offset(
-        head.x * cellSize + cellSize * 0.35,
-        head.y * cellSize + cellSize * 0.35,
-      ),
-      cellSize / 5,
-      headHighlightPaint,
-    );
+        // 绘制眼睛
+        final eyePaint = Paint()..color = Colors.white;
+        final eyeInnerPaint = Paint()..color = Colors.black;
 
-    // 绘制蛇眼睛
-    final eyePaint = Paint()
-      ..color = Colors.white;
-    final eyeInnerPaint = Paint()
-      ..color = Colors.black;
-    final eyeSize = cellSize / 5;
-    final eyeInnerSize = eyeSize / 2;
-    final eyeOffset = cellSize / 3;
+        void drawEyes(double x1, double y1, double x2, double y2) {
+          // 外圈白色
+          canvas.drawCircle(
+            Offset(headCenter.dx + x1, headCenter.dy + y1),
+            cellSize * 0.15,
+            eyePaint,
+          );
+          canvas.drawCircle(
+            Offset(headCenter.dx + x2, headCenter.dy + y2),
+            cellSize * 0.15,
+            eyePaint,
+          );
 
-    void drawEyes(double x1, double y1, double x2, double y2) {
-      canvas.drawCircle(
-        Offset(head.x * cellSize + x1, head.y * cellSize + y1),
-        eyeSize,
-        eyePaint,
-      );
-      canvas.drawCircle(
-        Offset(head.x * cellSize + x2, head.y * cellSize + y2),
-        eyeSize,
-        eyePaint,
-      );
-    }
+          // 内圈黑色
+          canvas.drawCircle(
+            Offset(headCenter.dx + x1, headCenter.dy + y1),
+            cellSize * 0.08,
+            eyeInnerPaint,
+          );
+          canvas.drawCircle(
+            Offset(headCenter.dx + x2, headCenter.dy + y2),
+            cellSize * 0.08,
+            eyeInnerPaint,
+          );
+        }
 
-    switch (game.direction) {
-      case Direction.right:
-        drawEyes(cellSize - eyeOffset, eyeOffset, cellSize - eyeOffset, cellSize - eyeOffset);
-        break;
-      case Direction.left:
-        drawEyes(eyeOffset, eyeOffset, eyeOffset, cellSize - eyeOffset);
-        break;
-      case Direction.up:
-        drawEyes(eyeOffset, eyeOffset, cellSize - eyeOffset, eyeOffset);
-        break;
-      case Direction.down:
-        drawEyes(eyeOffset, cellSize - eyeOffset, cellSize - eyeOffset, cellSize - eyeOffset);
-        break;
+        // 根据方向调整眼睛位置
+        final eyeOffset = cellSize * 0.2;
+        switch (game.direction) {
+          case Direction.right:
+            drawEyes(eyeOffset, -eyeOffset, eyeOffset, eyeOffset);
+            break;
+          case Direction.left:
+            drawEyes(-eyeOffset, -eyeOffset, -eyeOffset, eyeOffset);
+            break;
+          case Direction.up:
+            drawEyes(-eyeOffset, -eyeOffset, eyeOffset, -eyeOffset);
+            break;
+          case Direction.down:
+            drawEyes(-eyeOffset, eyeOffset, eyeOffset, eyeOffset);
+            break;
+        }
+      }
     }
   }
 

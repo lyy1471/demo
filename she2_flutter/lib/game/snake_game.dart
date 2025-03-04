@@ -199,4 +199,6 @@ class SnakeGame extends ChangeNotifier {
     timer?.cancel();
     super.dispose();
   }
+
+  bool get isInitialized => snake != null && food != null;
 }
