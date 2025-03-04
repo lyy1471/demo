@@ -1,5 +1,5 @@
-name: she_flutter
-description: "A new Flutter project."
+name: snake_game
+description: 一个可爱的贪吃蛇游戏
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -30,11 +30,11 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  cupertino_icons: ^1.0.6
 
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
-  cupertino_icons: ^1.0.6
 
 dev_dependencies:
   flutter_test:
