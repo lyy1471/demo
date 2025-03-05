@@ -73,9 +73,23 @@ class _SnakeGameWidgetState extends State<SnakeGameWidget> {
         autofocus: true,
         onKeyEvent: onKeyEvent,
         child: Scaffold(
-          backgroundColor: Colors.grey[200],
+          backgroundColor: const Color(0xFF1A1A2E),
           body: Stack(
             children: [
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        const Color(0xFF1A1A2E),
+                        Colors.indigo[900]!,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
               const MenuSnake(),
               Center(
                 child: Column(
@@ -100,44 +114,76 @@ class _SnakeGameWidgetState extends State<SnakeGameWidget> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.9),
+        color: Colors.black.withOpacity(0.6),
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Colors.indigo[400]!,
+          width: 2,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
+            color: Colors.indigo[700]!.withOpacity(0.3),
+            blurRadius: 15,
+            spreadRadius: 5,
           ),
         ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          SizedBox(
+            height: 120,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildAnimatedSnakeFace(),
+                const SizedBox(width: 20),
+                _buildAnimatedSnakeFace(),
+                const SizedBox(width: 20),
+                _buildAnimatedSnakeFace(),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
           Text(
             '贪吃蛇',
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  color: Colors.deepPurple,
-                  fontWeight: FontWeight.bold,
+              color: Colors.indigo[100],
+              fontWeight: FontWeight.bold,
+              shadows: [
+                Shadow(
+                  color: Colors.indigo[400]!,
+                  blurRadius: 10,
                 ),
+              ],
+            ),
           ),
           const SizedBox(height: 30),
-          _buildMenuButton(
-            '普通模式',
-            () {
-              game.initGame(GameMode.normal);
-              setState(() => showMenu = false);
-            },
-          ),
+          _buildMenuButton('普通模式', () {
+            game.initGame(GameMode.normal);
+            setState(() => showMenu = false);
+          }),
           const SizedBox(height: 15),
-          _buildMenuButton(
-            '闯关模式',
-            () {
-              game.initGame(GameMode.challenge);
-              setState(() => showMenu = false);
-            },
-          ),
+          _buildMenuButton('闯关模式', () {
+            game.initGame(GameMode.challenge);
+            setState(() => showMenu = false);
+          }),
         ],
       ),
+    );
+  }
+
+  Widget _buildAnimatedSnakeFace() {
+    return AnimatedBuilder(
+      animation: const AlwaysStoppedAnimation(0),
+      builder: (context, child) {
+        return CustomPaint(
+          size: const Size(80, 80),
+          painter: SnakeFacePainter(
+            currentTime: DateTime.now(),
+          ),
+        );
+      },
     );
   }
 
@@ -145,13 +191,31 @@ class _SnakeGameWidgetState extends State<SnakeGameWidget> {
     return ElevatedButton(
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.deepPurple,
+        backgroundColor: Colors.indigo[700],
+        foregroundColor: Colors.indigo[100],
         padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(30),
+          side: BorderSide(
+            color: Colors.indigo[400]!,
+            width: 2,
+          ),
+        ),
+        elevation: 8,
       ),
       child: Text(
         text,
-        style: const TextStyle(fontSize: 18, color: Colors.white),
+        style: TextStyle(
+          fontSize: 18,
+          color: Colors.indigo[100],
+          fontWeight: FontWeight.bold,
+          shadows: [
+            Shadow(
+              color: Colors.indigo[900]!,
+              blurRadius: 5,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -173,13 +237,16 @@ class _SnakeGameWidgetState extends State<SnakeGameWidget> {
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Colors.black.withOpacity(0.6),
         borderRadius: BorderRadius.circular(15),
+        border: Border.all(
+          color: Colors.indigo[400]!,
+          width: 2,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.indigo[700]!.withOpacity(0.3),
             blurRadius: 5,
-            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -190,6 +257,7 @@ class _SnakeGameWidgetState extends State<SnakeGameWidget> {
             icon: Icons.star,
             label: '分数',
             value: '${game.score}',
+            textColor: Colors.indigo[100]!,
           ),
           if (game.gameMode == GameMode.challenge) ...[
             const SizedBox(width: 20),
@@ -216,6 +284,7 @@ class _SnakeGameWidgetState extends State<SnakeGameWidget> {
     required String label,
     required String value,
     Color? valueColor,
+    Color? textColor,
   }) {
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -232,7 +301,7 @@ class _SnakeGameWidgetState extends State<SnakeGameWidget> {
           children: [
             Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 color: Colors.grey,
               ),
@@ -289,9 +358,16 @@ class _SnakeGameWidgetState extends State<SnakeGameWidget> {
           Text(
             '游戏结束',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: Colors.red,
-                  fontWeight: FontWeight.bold,
+              color: Colors.red[300],
+              fontWeight: FontWeight.bold,
+              shadows: [
+                Shadow(
+                  color: Colors.red[700]!,
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
                 ),
+              ],
+            ),
           ),
           const SizedBox(height: 20),
           Row(
@@ -349,18 +425,31 @@ class _SnakeGameWidgetState extends State<SnakeGameWidget> {
     return ElevatedButton(
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.deepPurple,
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.indigo[700],
+        foregroundColor: Colors.indigo[100],
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        elevation: 3,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(
+            color: Colors.indigo[400]!,
+            width: 2,
+          ),
+        ),
+        elevation: 8,
       ),
       child: Text(
         text,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.bold,
           letterSpacing: 1,
+          color: Colors.indigo[100],
+          shadows: [
+            Shadow(
+              color: Colors.black,
+              blurRadius: 3,
+            ),
+          ],
         ),
       ),
     );
@@ -383,17 +472,36 @@ class SnakeGamePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final cellSize = size.width / gridSize;
 
-    // 绘制网格背景
+    // 修改网格背景为深色
     final bgPaint = Paint()
       ..shader = LinearGradient(
         colors: [
-          Colors.green[50]!,
-          Colors.green[100]!,
+          const Color(0xFF1A1A2E).withOpacity(0.7),
+          Colors.indigo[900]!.withOpacity(0.7),
         ],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
     canvas.drawRect(Offset.zero & size, bgPaint);
+
+    // 添加网格线
+    final gridPaint = Paint()
+      ..color = Colors.white.withOpacity(0.05)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.5;
+
+    for (var i = 0; i <= gridSize; i++) {
+      canvas.drawLine(
+        Offset(i * cellSize, 0),
+        Offset(i * cellSize, size.height),
+        gridPaint,
+      );
+      canvas.drawLine(
+        Offset(0, i * cellSize),
+        Offset(size.width, i * cellSize),
+        gridPaint,
+      );
+    }
 
     // 检查游戏状态
     if (!game.isInitialized) return;
@@ -422,6 +530,17 @@ class SnakeGamePainter extends CustomPainter {
             foodCenter.dx - appleSize / 2, foodCenter.dy - appleSize / 2, foodCenter.dx, foodCenter.dy - appleSize / 2);
 
       canvas.drawPath(applePath, applePaint);
+
+      // 添加食物发光效果
+      final glowPaint = Paint()
+        ..maskFilter = const MaskFilter.blur(BlurStyle.outer, 3)
+        ..color = Colors.red[300]!.withOpacity(0.5);
+      
+      canvas.drawCircle(
+        foodCenter,
+        appleSize * 0.6,
+        glowPaint,
+      );
 
       // 绘制苹果茎
       final stemPaint = Paint()
@@ -483,8 +602,8 @@ class SnakeGamePainter extends CustomPainter {
           final snakeBodyPaint = Paint()
             ..shader = RadialGradient(
               colors: [
-                Colors.green[300]!,
-                Colors.green[500]!,
+                Colors.lightGreenAccent[400]!,
+                Colors.green[600]!,
               ],
               center: Alignment.topLeft,
             ).createShader(Rect.fromCircle(
@@ -532,8 +651,8 @@ class SnakeGamePainter extends CustomPainter {
         final headPaint = Paint()
           ..shader = RadialGradient(
             colors: [
-              Colors.green[400]!,
-              Colors.green[600]!,
+              Colors.lightGreenAccent[400]!,
+              Colors.green[700]!,
             ],
           ).createShader(Rect.fromCircle(
             center: headCenter,
@@ -593,6 +712,84 @@ class SnakeGamePainter extends CustomPainter {
             break;
         }
       }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+class SnakeFacePainter extends CustomPainter {
+  final DateTime currentTime;
+  final double blinkValue;
+  final double tongueValue;
+
+  SnakeFacePainter({
+    required this.currentTime,
+  }) : blinkValue = sin(currentTime.millisecondsSinceEpoch / 2000) * 0.5 + 0.5,
+       tongueValue = sin(currentTime.millisecondsSinceEpoch / 1000) * 0.5 + 0.5;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    
+    // 绘制蛇头
+    final headPaint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          Colors.green[400]!,
+          Colors.green[700]!,
+        ],
+      ).createShader(Rect.fromCircle(
+        center: center,
+        radius: size.width / 2,
+      ));
+    
+    canvas.drawCircle(center, size.width / 2, headPaint);
+    
+    // 绘制眼睛
+    final eyeSize = size.width * 0.2;
+    final eyeOffset = size.width * 0.15;
+    
+    // 眼白
+    final eyePaint = Paint()..color = Colors.white;
+    canvas.drawCircle(
+      Offset(center.dx - eyeOffset, center.dy - eyeOffset),
+      eyeSize * (1 - blinkValue * 0.8),
+      eyePaint,
+    );
+    canvas.drawCircle(
+      Offset(center.dx + eyeOffset, center.dy - eyeOffset),
+      eyeSize * (1 - blinkValue * 0.8),
+      eyePaint,
+    );
+    
+    // 瞳孔
+    final pupilPaint = Paint()..color = Colors.black;
+    canvas.drawCircle(
+      Offset(center.dx - eyeOffset, center.dy - eyeOffset),
+      eyeSize * 0.5 * (1 - blinkValue * 0.8),
+      pupilPaint,
+    );
+    canvas.drawCircle(
+      Offset(center.dx + eyeOffset, center.dy - eyeOffset),
+      eyeSize * 0.5 * (1 - blinkValue * 0.8),
+      pupilPaint,
+    );
+    
+    // 绘制舌头
+    if (tongueValue > 0.5) {
+      final tonguePaint = Paint()..color = Colors.red[400]!;
+      final tongueLength = size.width * 0.3 * (tongueValue - 0.5) * 2;
+      
+      final tonguePath = Path()
+        ..moveTo(center.dx, center.dy + size.height * 0.2)
+        ..lineTo(center.dx - size.width * 0.1, center.dy + size.height * 0.2 + tongueLength)
+        ..lineTo(center.dx, center.dy + size.height * 0.2 + tongueLength * 0.8)
+        ..lineTo(center.dx + size.width * 0.1, center.dy + size.height * 0.2 + tongueLength)
+        ..close();
+      
+      canvas.drawPath(tonguePath, tonguePaint);
     }
   }
 
